@@ -8,10 +8,12 @@ import (
 
 // NewMinter returns a new Minter object with the given inflation and annual
 // provisions values.
-func NewMinter(inflation, annualProvisions sdk.Dec) Minter {
+func NewMinter(inflation, annualProvisions sdk.Dec, phase, startPhaseBlock uint64) Minter {
 	return Minter{
 		Inflation:        inflation,
 		AnnualProvisions: annualProvisions,
+		Phase:            phase,
+		StartPhaseBlock:  startPhaseBlock,
 	}
 }
 
@@ -20,6 +22,8 @@ func InitialMinter(inflation sdk.Dec) Minter {
 	return NewMinter(
 		inflation,
 		sdk.NewDec(0),
+		0,
+		0,
 	)
 }
 
@@ -40,21 +44,19 @@ func ValidateMinter(minter Minter) error {
 	return nil
 }
 
-// NextInflationRate returns the new inflation rate for the next hour.
-func (m Minter) NextInflationRate(params Params, currentBlock sdk.Dec) sdk.Dec {
-	phase := currentBlock.Quo(sdk.NewDec(int64(params.BlocksPerYear))).Ceil()
-
+// PhaseInflationRate returns the inflation rate by phase.
+func (m Minter) PhaseInflationRate(phase uint64) sdk.Dec {
 	switch {
-	case phase.GT(sdk.NewDec(12)):
+	case phase > 12:
 		return sdk.ZeroDec()
 
-	case phase.Equal(sdk.NewDec(1)):
+	case phase == 1:
 		return sdk.NewDecWithPrec(40, 2)
 
-	case phase.Equal(sdk.NewDec(2)):
+	case phase == 2:
 		return sdk.NewDecWithPrec(20, 2)
 
-	case phase.Equal(sdk.NewDec(3)):
+	case phase == 3:
 		return sdk.NewDecWithPrec(10, 2)
 
 	default:
@@ -63,8 +65,24 @@ func (m Minter) NextInflationRate(params Params, currentBlock sdk.Dec) sdk.Dec {
 		// Phase6:  7%
 		// ...
 		// Phase12: 1%
-		return sdk.NewDecWithPrec(13-phase.RoundInt64(), 2)
+		return sdk.NewDecWithPrec(13-int64(phase), 2)
 	}
+}
+
+// NextPhase returns the new phase.
+func (m Minter) NextPhase(params Params, currentBlock uint64) uint64 {
+
+	nonePhase := m.Phase == 0
+	if nonePhase {
+		return 1
+	}
+
+	blockNewPhase := m.StartPhaseBlock + params.BlocksPerYear
+	if blockNewPhase > currentBlock {
+		return m.Phase
+	}
+
+	return m.Phase + 1
 }
 
 // NextAnnualProvisions returns the annual provisions based on current total
