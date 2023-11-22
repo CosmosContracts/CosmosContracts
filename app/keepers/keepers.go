@@ -49,6 +49,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -490,31 +491,42 @@ func NewAppKeepers(
 	wasmOpts = append(wasmOpts, tfOpts...)
 
 	// Stargate Queries
+	// (Define custom modules here, then the next function takes care of the standard SDK types)
 	accepted := wasmkeeper.AcceptedStargateQueries{
+		// wasm
+		"/cosmwasm.wasm.v1/Query/ContractInfo":       &wasmtypes.QueryContractInfoResponse{},
+		"/cosmwasm.wasm.v1/Query/ContractHistory":    &wasmtypes.QueryContractHistoryResponse{},
+		"/cosmwasm.wasm.v1/Query/ContractsByCode":    &wasmtypes.QueryContractsByCodeResponse{},
+		"/cosmwasm.wasm.v1/Query/AllContractState":   &wasmtypes.QueryAllContractStateResponse{},
+		"/cosmwasm.wasm.v1/Query/RawContractState":   &wasmtypes.QueryRawContractStateResponse{},
+		"/cosmwasm.wasm.v1/Query/SmartContractState": &wasmtypes.QuerySmartContractStateResponse{},
+		"/cosmwasm.wasm.v1/Query/Code":               &wasmtypes.QueryCodeResponse{},
+		"/cosmwasm.wasm.v1/Query/Codes":              &wasmtypes.QueryCodesResponse{},
+		"/cosmwasm.wasm.v1/Query/PinnedCodes":        &wasmtypes.QueryPinnedCodesResponse{},
+		"/cosmwasm.wasm.v1/Query/Params":             &wasmtypes.QueryParamsResponse{},
+		"/cosmwasm.wasm.v1/Query/ContractsByCreator": &wasmtypes.QueryContractsByCreatorResponse{},
+
 		// ibc
 		"/ibc.core.client.v1.Query/ClientState":    &ibcclienttypes.QueryClientStateResponse{},
 		"/ibc.core.client.v1.Query/ConsensusState": &ibcclienttypes.QueryConsensusStateResponse{},
 		"/ibc.core.connection.v1.Query/Connection": &ibcconnectiontypes.QueryConnectionResponse{},
 
-		// governance
-		"/cosmos.gov.v1beta1.Query/Vote": &govv1.QueryVoteResponse{},
-
-		// distribution
-		"/cosmos.distribution.v1beta1.Query/DelegationRewards": &distrtypes.QueryDelegationRewardsResponse{},
-
-		// staking
-		"/cosmos.staking.v1beta1.Query/Delegation":          &stakingtypes.QueryDelegationResponse{},
-		"/cosmos.staking.v1beta1.Query/Redelegations":       &stakingtypes.QueryRedelegationsResponse{},
-		"/cosmos.staking.v1beta1.Query/UnbondingDelegation": &stakingtypes.QueryUnbondingDelegationResponse{},
-		"/cosmos.staking.v1beta1.Query/Validator":           &stakingtypes.QueryValidatorResponse{},
-		"/cosmos.staking.v1beta1.Query/Params":              &stakingtypes.QueryParamsResponse{},
-		"/cosmos.staking.v1beta1.Query/Pool":                &stakingtypes.QueryPoolResponse{},
-
 		// token factory
 		"/osmosis.tokenfactory.v1beta1.Query/Params":                 &tokenfactorytypes.QueryParamsResponse{},
 		"/osmosis.tokenfactory.v1beta1.Query/DenomAuthorityMetadata": &tokenfactorytypes.QueryDenomAuthorityMetadataResponse{},
 		"/osmosis.tokenfactory.v1beta1.Query/DenomsFromCreator":      &tokenfactorytypes.QueryDenomsFromCreatorResponse{},
+
+		// feeshare
+		"/juno.feeshare.v1.Query/FeeShares":           &feesharetypes.QueryFeeSharesResponse{},
+		"/juno.feeshare.v1.Query/FeeShare":            &feesharetypes.QueryFeeShareResponse{},
+		"/juno.feeshare.v1.Query/Params":              &feesharetypes.QueryParamsResponse{},
+		"/juno.feeshare.v1.Query/DeployerFeeShares":   &feesharetypes.QueryDeployerFeeSharesResponse{},
+		"/juno.feeshare.v1.Query/WithdrawerFeeShares": &feesharetypes.QueryWithdrawerFeeSharesResponse{},
+
+		// globalfee
+		"/gaia.globalfee.v1beta1.Query/MinimumGasPrices": &globalfeetypes.QueryMinimumGasPricesResponse{},
 	}
+	accepted = addCosmosSDKStdStargateQueries(accepted)
 
 	querierOpts := wasmkeeper.WithQueryPlugins(
 		&wasmkeeper.QueryPlugins{
@@ -680,6 +692,118 @@ func NewAppKeepers(
 	appKeepers.ScopedICAControllerKeeper = scopedICAControllerKeeper
 
 	return appKeepers
+}
+
+func addCosmosSDKStdStargateQueries(asq wasmkeeper.AcceptedStargateQueries) wasmkeeper.AcceptedStargateQueries {
+	std := map[string]codec.ProtoMarshaler{
+		// auth
+		"/cosmos.auth.v1beta1.Query/Account":              &authtypes.QueryAccountResponse{},
+		"/cosmos.auth.v1beta1.Query/AccountAddressByID":   &authtypes.QueryAccountAddressByIDResponse{},
+		"/cosmos.auth.v1beta1.Query/Params":               &authtypes.QueryParamsResponse{},
+		"/cosmos.auth.v1beta1.Query/ModuleAccounts":       &authtypes.QueryModuleAccountsResponse{},
+		"/cosmos.auth.v1beta1.Query/ModuleAccountByName":  &authtypes.QueryModuleAccountByNameResponse{},
+		"/cosmos.auth.v1beta1.Query/Bech32Prefix":         &authtypes.Bech32PrefixResponse{},
+		"/cosmos.auth.v1beta1.Query/AddressBytesToString": &authtypes.AddressBytesToStringResponse{},
+		"/cosmos.auth.v1beta1.Query/AddressStringToBytes": &authtypes.AddressStringToBytesResponse{},
+		"/cosmos.auth.v1beta1.Query/AccountInfo":          &authtypes.QueryAccountInfoResponse{},
+
+		// authz
+		"/cosmos.authz.v1beta1.Query/Grants":        &authz.QueryGrantsResponse{},
+		"/cosmos.authz.v1beta1.Query/GranterGrants": &authz.QueryGranterGrantsResponse{},
+
+		// bank
+		"/cosmos.bank.v1beta1.Query/Balance":                 &banktypes.QueryBalanceResponse{},
+		"/cosmos.bank.v1beta1.Query/AllBalances":             &banktypes.QueryAllBalancesResponse{},
+		"/cosmos.bank.v1beta1.Query/SpendableBalances":       &banktypes.QuerySpendableBalancesResponse{},
+		"/cosmos.bank.v1beta1.Query/SpendableBalanceByDenom": &banktypes.QuerySpendableBalanceByDenomResponse{},
+		"/cosmos.bank.v1beta1.Query/TotalSupply":             &banktypes.QueryTotalSupplyResponse{},
+		"/cosmos.bank.v1beta1.Query/SupplyOf":                &banktypes.QuerySupplyOfResponse{},
+		"/cosmos.bank.v1beta1.Query/Params":                  &banktypes.QueryParamsResponse{},
+		"/cosmos.bank.v1beta1.Query/DenomMetadata":           &banktypes.QueryDenomMetadataResponse{},
+		"/cosmos.bank.v1beta1.Query/DenomsMetadata":          &banktypes.QueryDenomsMetadataResponse{},
+		"/cosmos.bank.v1beta1.Query/DenomOwners":             &banktypes.QueryDenomOwnersResponse{},
+		"/cosmos.bank.v1beta1.Query/SendEnabled":             &banktypes.QuerySendEnabledResponse{},
+
+		// consensus
+		"/cosmos.consensus.v1beta1.Query/Params": &consensusparamtypes.QueryParamsResponse{},
+
+		// distribution
+		"/cosmos.distribution.v1beta1.Query/ParamsRequest":               &distrtypes.QueryParamsRequest{},
+		"/cosmos.distribution.v1beta1.Query/ValidatorDistributionInfo":   &distrtypes.QueryValidatorDistributionInfoResponse{},
+		"/cosmos.distribution.v1beta1.Query/ValidatorOutstandingRewards": &distrtypes.QueryValidatorOutstandingRewardsResponse{},
+		"/cosmos.distribution.v1beta1.Query/ValidatorCommission":         &distrtypes.QueryValidatorCommissionResponse{},
+		"/cosmos.distribution.v1beta1.Query/ValidatorSlashes":            &distrtypes.QueryValidatorSlashesResponse{},
+		"/cosmos.distribution.v1beta1.Query/DelegationRewards":           &distrtypes.QueryDelegationRewardsResponse{},
+		"/cosmos.distribution.v1beta1.Query/DelegationTotalRewards":      &distrtypes.QueryDelegationTotalRewardsResponse{},
+		"/cosmos.distribution.v1beta1.Query/DelegatorValidators":         &distrtypes.QueryDelegatorValidatorsResponse{},
+		"/cosmos.distribution.v1beta1.Query/DelegatorWithdrawAddress":    &distrtypes.QueryDelegatorWithdrawAddressResponse{},
+		"/cosmos.distribution.v1beta1.Query/CommunityPool":               &distrtypes.QueryCommunityPoolResponse{},
+
+		// evidence
+		"/cosmos.evidence.v1beta1.Query/Evidence":    &evidencetypes.QueryEvidenceResponse{},
+		"/cosmos.evidence.v1beta1.Query/AllEvidence": &evidencetypes.QueryAllEvidenceResponse{},
+
+		// feegrant
+		"/cosmos.feegrant.v1beta1.Query/Allowance":           &feegrant.QueryAllowanceResponse{},
+		"/cosmos.feegrant.v1beta1.Query/Allowances":          &feegrant.QueryAllowancesResponse{},
+		"/cosmos.feegrant.v1beta1.Query/AllowancesByGranter": &feegrant.QueryAllowancesByGranterResponse{},
+
+		// governance
+		"/cosmos.gov.v1beta1.Query/Proposal":    &govv1.QueryProposalResponse{},
+		"/cosmos.gov.v1beta1.Query/Proposals":   &govv1.QueryProposalsResponse{},
+		"/cosmos.gov.v1beta1.Query/Vote":        &govv1.QueryVoteResponse{},
+		"/cosmos.gov.v1beta1.Query/Votes":       &govv1.QueryVotesResponse{},
+		"/cosmos.gov.v1beta1.Query/Params":      &govv1.QueryParamsResponse{},
+		"/cosmos.gov.v1beta1.Query/Deposit":     &govv1.QueryDepositResponse{},
+		"/cosmos.gov.v1beta1.Query/TallyResult": &govv1.QueryTallyResultResponse{},
+
+		// mint
+		"/juno.mint.Query/Params":           &minttypes.QueryParamsResponse{},
+		"/juno.mint.Query/Inflation":        &minttypes.QueryInflationResponse{},
+		"/juno.mint.Query/AnnualProvisions": &minttypes.QueryAnnualProvisionsResponse{},
+
+		// nft
+		"/cosmos.nft.v1beta1.Query/Balance": &nft.QueryBalanceResponse{},
+		"/cosmos.nft.v1beta1.Query/Owner":   &nft.QueryOwnerResponse{},
+		"/cosmos.nft.v1beta1.Query/Supply":  &nft.QuerySupplyResponse{},
+		"/cosmos.nft.v1beta1.Query/NFTs":    &nft.QueryNFTsResponse{},
+		"/cosmos.nft.v1beta1.Query/NFT":     &nft.QueryNFTResponse{},
+		"/cosmos.nft.v1beta1.Query/Class":   &nft.QueryClassResponse{},
+		"/cosmos.nft.v1beta1.Query/Classes": &nft.QueryClassesResponse{},
+
+		// slashing
+		"/cosmos.slashing.v1beta1.Query/Params":       &slashingtypes.QueryParamsResponse{},
+		"/cosmos.slashing.v1beta1.Query/SigningInfo":  &slashingtypes.QuerySigningInfoResponse{},
+		"/cosmos.slashing.v1beta1.Query/SigningInfos": &slashingtypes.QuerySigningInfosResponse{},
+
+		// staking
+		"/cosmos.staking.v1beta1.Query/Validators":                    &stakingtypes.QueryValidatorsResponse{},
+		"/cosmos.staking.v1beta1.Query/Validator":                     &stakingtypes.QueryValidatorResponse{},
+		"/cosmos.staking.v1beta1.Query/ValidatorDelegations":          &stakingtypes.QueryValidatorDelegationsResponse{},
+		"/cosmos.staking.v1beta1.Query/ValidatorUnbondingDelegations": &stakingtypes.QueryValidatorUnbondingDelegationsResponse{},
+		"/cosmos.staking.v1beta1.Query/Delegation":                    &stakingtypes.QueryDelegationResponse{},
+		"/cosmos.staking.v1beta1.Query/UnbondingDelegation":           &stakingtypes.QueryUnbondingDelegationResponse{},
+		"/cosmos.staking.v1beta1.Query/DelegatorDelegations":          &stakingtypes.QueryDelegatorDelegationsResponse{},
+		"/cosmos.staking.v1beta1.Query/DelegatorUnbondingDelegations": &stakingtypes.QueryDelegatorUnbondingDelegationsResponse{},
+		"/cosmos.staking.v1beta1.Query/Redelegations":                 &stakingtypes.QueryRedelegationsResponse{},
+		"/cosmos.staking.v1beta1.Query/DelegatorValidators":           &stakingtypes.QueryDelegatorValidatorsResponse{},
+		"/cosmos.staking.v1beta1.Query/DelegatorValidator":            &stakingtypes.QueryDelegatorValidatorResponse{},
+		"/cosmos.staking.v1beta1.Query/HistoricalInfo":                &stakingtypes.QueryHistoricalInfoResponse{},
+		"/cosmos.staking.v1beta1.Query/Params":                        &stakingtypes.QueryParamsResponse{},
+		"/cosmos.staking.v1beta1.Query/Pool":                          &stakingtypes.QueryPoolResponse{},
+
+		// upgrade
+		"/cosmos.upgrade.v1beta1.Query/CurrentPlan":                 &upgradetypes.QueryCurrentPlanResponse{},
+		"/cosmos.upgrade.v1beta1.Query/AppliedPlan":                 &upgradetypes.QueryAppliedPlanResponse{},
+		"/cosmos.upgrade.v1beta1.Query/QueryModuleVersionsResponse": &upgradetypes.QueryModuleVersionsResponse{},
+		"/cosmos.upgrade.v1beta1.Query/QueryAuthorityResponse":      &upgradetypes.QueryAuthorityResponse{},
+	}
+
+	updated := asq
+	for k, v := range std {
+		updated[k] = v
+	}
+	return updated
 }
 
 // initParamsKeeper init params keeper and its subspaces
